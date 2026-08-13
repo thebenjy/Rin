@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from "react"
-import { Helmet } from 'react-helmet'
 import { useTranslation } from "react-i18next"
 import { Link, useSearch } from "wouter"
 import { FeedCard } from "../components/feed_card"
+import { SiteMeta } from "../components/site-meta"
 import { Waiting } from "../components/loading"
 import { client } from "../app/runtime"
 
 import { useSiteConfig } from "../hooks/useSiteConfig";
-import { siteName } from "../utils/constants"
 import { tryInt } from "../utils/int"
 
 type FeedsData = {
@@ -25,7 +24,6 @@ export function SearchPage({ keyword }: { keyword: string }) {
     const page = tryInt(1, query.get("page"))
     const limit = tryInt(siteConfig.pageSize, query.get("limit"))
     const feedListClass = siteConfig.feedLayout === "masonry" ? "wauto columns-1 gap-5 md:columns-2" : "wauto flex flex-col";
-    const feedData = Array.isArray(feeds?.data) ? feeds.data : [];
     const ref = useRef("")
     function fetchFeeds() {
         if (!keyword) return
@@ -49,14 +47,7 @@ export function SearchPage({ keyword }: { keyword: string }) {
     const title = t('article.search.title$keyword', { keyword })
     return (
         <>
-            <Helmet>
-                <title>{`${title} - ${siteConfig.name}`}</title>
-                <meta property="og:site_name" content={siteName} />
-                <meta property="og:title" content={title} />
-                <meta property="og:image" content={siteConfig.avatar} />
-                <meta property="og:type" content="article" />
-                <meta property="og:url" content={document.URL} />
-            </Helmet>
+            <SiteMeta title={title} />
             <Waiting for={status === 'idle'}>
                 <main className="w-full flex flex-col justify-center items-center mb-8">
                     <div className="wauto text-start text-black dark:text-white py-4 text-4xl font-bold">
@@ -71,7 +62,7 @@ export function SearchPage({ keyword }: { keyword: string }) {
                     </div>
                     <Waiting for={status === 'idle'}>
                         <div className={feedListClass}>
-                            {feedData.map(({ id, ...feed }: any) => (
+                            {feeds?.data.map(({ id, ...feed }: any) => (
                                 <FeedCard key={id} id={id} {...feed} />
                             ))}
                         </div>

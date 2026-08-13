@@ -26,7 +26,7 @@ import {
 export function ConfigService(): Hono {
     const app = new Hono();
 
-    function serializeBootstrapScript(config: Record<string, unknown>) {
+    function serializeBootstrapScript(config: Record<string, unknown>, loggedIn: boolean) {
         const serialized = JSON.stringify(config)
             .replace(/</g, "\\u003C")
             .replace(/>/g, "\\u003E")
@@ -34,7 +34,7 @@ export function ConfigService(): Hono {
             .replace(/\u2028/g, "\\u2028")
             .replace(/\u2029/g, "\\u2029");
 
-        return `globalThis.__RIN_CLIENT_CONFIG__=${serialized};`;
+        return `globalThis.__RIN_CLIENT_CONFIG__=${serialized};window.__RIN_LOGGED_IN__=${loggedIn};`;
     }
 
     // POST /config/test-ai - Test AI model configuration
@@ -296,9 +296,10 @@ export function ConfigService(): Hono {
         const clientConfig = c.get('clientConfig');
         const serverConfig = c.get('serverConfig');
         const env = c.get('env');
+        const loggedIn = Boolean(c.get('uid'));
         const profile = <T>(name: string, task: () => Promise<T>) => profileAsync(c, name, task);
         const config = await profileAsync(c, 'bootstrap_client_config', () => buildClientConfigResponse(clientConfig, serverConfig, env, profile));
-        const script = await profileAsync(c, 'bootstrap_script', () => Promise.resolve(serializeBootstrapScript(config)));
+        const script = await profileAsync(c, 'bootstrap_script', () => Promise.resolve(serializeBootstrapScript(config, loggedIn)));
 
         return new Response(script, {
             status: 200,

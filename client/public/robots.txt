@@ -1,5 +1,6 @@
-User-agent: Googlebot
-Disallow: /writing/
-
 User-agent: *
 Allow: /
+Disallow: /admin/
+Disallow: /api/
+
+Sitemap: https://blog.food-signals.com/sitemap.xml

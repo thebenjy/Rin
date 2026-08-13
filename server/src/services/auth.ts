@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import type { AppContext, Variables } from "../core/hono-types";
 import { profileAsync } from "../core/server-timing";
 import { setJWTCookie, clearJWTCookie } from "../core/hono-middleware";
+import { setTrackingExclusionCookie } from "../utils/tracking-exclusion";
 import { users } from "../db/schema";
 import {
     BadRequestError,
@@ -98,6 +99,7 @@ export function PasswordAuthService(): Hono<{
 
             // Set JWT cookie using Hono helper
             setJWTCookie(c, token);
+            setTrackingExclusionCookie(c);
 
             return c.json({
                 success: true,
@@ -129,6 +131,7 @@ export function PasswordAuthService(): Hono<{
 
         // Set JWT cookie using Hono helper
         setJWTCookie(c, token);
+        setTrackingExclusionCookie(c);
 
         return c.json({
             success: true,

@@ -1,6 +1,7 @@
 import { getApp } from "./app-instance";
+import { buildHeadInjection } from "./seo-meta";
 
-const ROOT_FEED_PATTERN = /^\/(rss\.xml|atom\.xml|rss\.json|feed\.json|feed\.xml)$/;
+const ROOT_FEED_PATTERN = /^\/(rss\.xml|atom\.xml|rss\.json|feed\.json|feed\.xml|sitemap\.xml)$/;
 const APP_PUBLIC_ROUTE_PATTERN = /^\/(favicon|favicon\.ico)(?:\/|$)/;
 
 function isApiRequest(pathname: string) {
@@ -50,11 +51,33 @@ async function serveSpaEntry(request: Request, env: Env) {
     const indexRequest = new Request(new URL("/", url.origin), request);
     const indexResponse = await env.ASSETS.fetch(indexRequest);
     if (indexResponse.status === 200 || (indexResponse.status >= 300 && indexResponse.status < 400)) {
-      return indexResponse;
+      return injectSeoHead(indexResponse, request, env);
     }
   } catch {}
 
   return null;
+}
+
+async function injectSeoHead(response: Response, request: Request, env: Env) {
+  if (response.status !== 200) {
+    return response;
+  }
+
+  try {
+    const headMarkup = await buildHeadInjection(request, env);
+    if (!headMarkup) {
+      return response;
+    }
+
+    const html = await response.text();
+    const injected = html.replace("</head>", `${headMarkup}</head>`);
+    const headers = new Headers(response.headers);
+    headers.delete("content-length");
+
+    return new Response(injected, { status: response.status, headers });
+  } catch {
+    return response;
+  }
 }
 
 export async function handleFetch(request: Request, env: Env): Promise<Response> {

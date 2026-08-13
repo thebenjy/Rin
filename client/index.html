@@ -4,6 +4,129 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script data-cfasync="false" src="/api/config/client/bootstrap.js"></script>
+
+    <!-- Staff/logged-in exclusion gate for GTM + fs_attr below. window.__RIN_LOGGED_IN__
+         comes from bootstrap.js above (this app's own session); fs_internal_notrack is the
+         cookie shared with food-signals.com's exclude-staff-from-site-tracking companion
+         change, set at login on either property. Either signal suppresses tracking here. -->
+    <script>
+      window.__RIN_EXCLUDE_TRACKING__ = function () {
+        return window.__RIN_LOGGED_IN__ === true || document.cookie.indexOf('fs_internal_notrack=') !== -1;
+      };
+    </script>
+
+    <!-- First-touch acquisition capture. Ported from glp1mealplannerwebsiteandservice's
+         src/components/Attribution.astro — same cookie name/shape/domain so a reader who
+         lands here first (e.g. from a UTM-tagged social post) has utm_source/medium/campaign/
+         content/term/qr/ref/fbclid/gclid already in the shared fs_attr cookie by the time they
+         click through to food-signals.com, where EmailCTA/LandingPageForm read it via
+         window.FSAttribution.get() for the sign_up/lead events. First-touch-wins: never
+         overwrites a value already captured on either domain. Requires blog.food-signals.com
+         to be in GA4's cross-domain measurement list (Data Streams > Configure your domains)
+         so the hop doesn't split into a new session / self-referral. -->
+    <script>
+      (function () {
+        if (window.__RIN_EXCLUDE_TRACKING__()) return;
+
+        var COOKIE_NAME = 'fs_attr';
+        var MAX_AGE_SECONDS = 60 * 60 * 24 * 90; // 90 days
+
+        var PARAM_MAP = {
+          utm_source: 'utm_source',
+          utm_medium: 'utm_medium',
+          utm_campaign: 'utm_campaign',
+          utm_content: 'utm_content',
+          utm_term: 'utm_term',
+          qr_code: 'qr',
+          referral_code: 'ref',
+          fbclid: 'fbclid',
+          gclid: 'gclid',
+        };
+
+        function readCookie(name) {
+          var match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+          return match ? decodeURIComponent(match[1]) : null;
+        }
+
+        function readStored() {
+          var raw = readCookie(COOKIE_NAME);
+          if (!raw) {
+            try { raw = window.localStorage.getItem(COOKIE_NAME); } catch (e) { /* storage blocked */ }
+          }
+          if (!raw) return {};
+          try {
+            var parsed = JSON.parse(raw);
+            return (parsed && typeof parsed === 'object') ? parsed : {};
+          } catch (e) {
+            return {};
+          }
+        }
+
+        // A Domain attribute can only be set to the current host or a parent of it.
+        // On localhost/preview hosts we omit Domain entirely (cookie stays scoped
+        // to that host, which is fine for local/dev testing).
+        function cookieDomain() {
+          var host = window.location.hostname;
+          return (/(^|\.)food-signals\.com$/).test(host) ? 'food-signals.com' : null;
+        }
+
+        function writeStored(obj) {
+          var json = JSON.stringify(obj);
+          var domain = cookieDomain();
+          var cookieStr = COOKIE_NAME + '=' + encodeURIComponent(json) +
+            '; Path=/; Max-Age=' + MAX_AGE_SECONDS + '; SameSite=Lax';
+          if (domain) cookieStr += '; Domain=' + domain;
+          if (window.location.protocol === 'https:') cookieStr += '; Secure';
+          document.cookie = cookieStr;
+          try { window.localStorage.setItem(COOKIE_NAME, json); } catch (e) { /* storage blocked */ }
+        }
+
+        var params = new URLSearchParams(window.location.search);
+        var current = readStored();
+        var changed = false;
+
+        Object.keys(PARAM_MAP).forEach(function (field) {
+          if (current[field]) return; // first-touch-wins: never overwrite an existing value
+          var value = params.get(PARAM_MAP[field]);
+          if (value) {
+            current[field] = value;
+            changed = true;
+          }
+        });
+
+        if (!current.landing_page) { current.landing_page = window.location.pathname; changed = true; }
+        if (!current.first_seen_at) { current.first_seen_at = new Date().toISOString(); changed = true; }
+
+        if (changed) writeStored(current);
+
+        window.FSAttribution = {
+          get: function () { return current; },
+        };
+      })();
+    </script>
+
+    <!-- Google Tag Manager. Same container as food-signals.com (GTM-PCRD6FN9), which
+         owns the GA4 Configuration tag for the shared "Food Signals" property
+         (G-TSC3B4YS7Z / properties/544475019). Loading it here reports blog pageviews
+         into that same property, distinguished by hostName=blog.food-signals.com — no
+         separate GA4 property or GTM container needed. Do not add a gtag('config')
+         call here (GTM already fires it; that would double-count). -->
+    <script>
+      if (!window.__RIN_EXCLUDE_TRACKING__()) {
+        (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+        new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+        j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+        'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+        })(window,document,'script','dataLayer','GTM-PCRD6FN9');
+      }
+    </script>
+    <!-- Unconditional regardless of the exclusion gate above: other code may call
+         gtag(...) even when GTM never loads, and it must not throw. -->
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    </script>
   </head>
   <body>
     <div id="root"></div>

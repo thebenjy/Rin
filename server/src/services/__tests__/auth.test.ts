@@ -124,6 +124,26 @@ describe("PasswordAuthService", () => {
       expect(errorData.error.message).toBe("Invalid credentials");
     });
 
+    it("should set the shared tracking-exclusion cookie alongside the token cookie", async () => {
+      const res = await app.request("/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: "admin", password: "admin123" }),
+      }, env);
+
+      expect(res.status).toBe(200);
+      const cookies = res.headers.getSetCookie();
+      expect(cookies.some((c) => c.startsWith("token="))).toBe(true);
+      const trackingCookie = cookies.find((c) => c.startsWith("fs_internal_notrack="));
+      expect(trackingCookie).toBeDefined();
+      expect(trackingCookie).toContain("Domain=.food-signals.com");
+      expect(trackingCookie).toContain("Path=/");
+      expect(trackingCookie).toContain("Secure");
+      expect(trackingCookie).toContain("SameSite=Lax");
+      expect(trackingCookie).toContain("Max-Age=15552000");
+      expect(trackingCookie).not.toContain("HttpOnly");
+    });
+
     it("should login with regular user credentials", async () => {
       // Create a regular user with password
       sqlite.exec(`

@@ -21,8 +21,10 @@ export interface RequestOptions {
 
 export interface Feed {
   id: number;
+  alias: string | null;
   title: string | null;
   content: string;
+  summary: string;
   uid: number;
   createdAt: string;
   updatedAt: string;
@@ -44,6 +46,7 @@ export interface FeedListResponse {
   size: number;
   data: Array<{
     id: number;
+    alias: string | null;
     title: string | null;
     summary: string;
     hashtags: Array<{ id: number; name: string }>;
@@ -63,6 +66,7 @@ export interface FeedListResponse {
 
 export interface TimelineItem {
   id: number;
+  alias: string | null;
   title: string | null;
   createdAt: string;
 }
@@ -92,6 +96,7 @@ export interface UpdateFeedRequest {
 
 export interface AdjacentFeed {
   id: number;
+  alias: string | null;
   title: string | null;
   summary: string;
   hashtags: Array<{ id: number; name: string }>;

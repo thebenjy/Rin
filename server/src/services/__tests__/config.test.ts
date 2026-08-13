@@ -46,10 +46,24 @@ describe("ConfigService", () => {
             const body = await res.text();
             expect(body).toContain("globalThis.__RIN_CLIENT_CONFIG__=");
             expect(body).toContain('"site.page_size":5');
+            expect(body).toContain("window.__RIN_LOGGED_IN__=false");
             expect(res.headers.get("Server-Timing")).toContain("bootstrap_client_config");
             expect(res.headers.get("Server-Timing")).toContain("client_config_all");
             expect(res.headers.get("Server-Timing")).toContain("client_ai_enabled");
             expect(res.headers.get("Server-Timing")).toContain("bootstrap_script");
+        });
+
+        it("should report logged-in state in bootstrap script for an authenticated request", async () => {
+            const res = await app.request("/client/bootstrap.js", {
+                method: "GET",
+                headers: {
+                    Authorization: "Bearer mock_token_1",
+                },
+            });
+
+            expect(res.status).toBe(200);
+            const body = await res.text();
+            expect(body).toContain("window.__RIN_LOGGED_IN__=true");
         });
 
         it("should get client config without authentication", async () => {

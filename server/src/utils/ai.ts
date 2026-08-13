@@ -234,8 +234,8 @@ export async function generateAISummaryResult(
         if (provider === 'worker-ai') {
             const fullModelName = getWorkerAIModelId(model);
             result = await executeWorkerAI(
-                env,
-                fullModelName,
+                env, 
+                fullModelName, 
                 summaryMessages,
             );
         } else {
@@ -250,16 +250,7 @@ export async function generateAISummaryResult(
             };
         }
 
-        const cleaned = stripReasoningTags(result);
-        if (!cleaned.trim()) {
-            return {
-                summary: null,
-                skipped: false,
-                error: `AI response contained only reasoning tags with no final answer (provider "${provider}", model "${model}")`,
-            };
-        }
-
-        return { summary: cleaned, skipped: false };
+        return { summary: result, skipped: false };
     } catch (error) {
         console.error("[AI Summary] Failed to generate summary:", error);
         return {
@@ -268,20 +259,6 @@ export async function generateAISummaryResult(
             error: error instanceof Error ? error.message : String(error),
         };
     }
-}
-
-export function stripReasoningTags(text: string): string {
-    if (!text) return "";
-
-    let out = text;
-    out = out.replace(/<think(?:\s[^>]*)?>[\s\S]*?<\/think\s*>/gi, "");
-    out = out.replace(/<think(?:\s[^>]*)?>[\s\S]*$/gi, "");
-    out = out.replace(/<thinking(?:\s[^>]*)?>[\s\S]*?<\/thinking\s*>/gi, "");
-    out = out.replace(/<thinking(?:\s[^>]*)?>[\s\S]*$/gi, "");
-    out = out.replace(/<reasoning(?:\s[^>]*)?>[\s\S]*?<\/reasoning\s*>/gi, "");
-    out = out.replace(/<reasoning(?:\s[^>]*)?>[\s\S]*$/gi, "");
-
-    return out.trim();
 }
 
 /**

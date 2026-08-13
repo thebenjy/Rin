@@ -62,12 +62,6 @@ async function syncWorkerSecrets(workerName: string) {
 }
 
 async function buildClient() {
-  const distIndex = Bun.file("./dist/client/index.html");
-  if (await distIndex.exists()) {
-    console.log("✅ Using pre-built client from ./dist/client");
-    return;
-  }
-
   console.log("🔨 Building client...");
   await $`cd client && ${bunExec} run build`.quiet();
   console.log("✅ Client built successfully");
@@ -145,6 +139,7 @@ export async function runCloudflareDeploy(target: "all" | "server" | "client" = 
   const dbName = renv("DB_NAME", "rin");
   const workerName = renv("WORKER_NAME", "rin-server");
   const taskQueueName = env("TASK_QUEUE_NAME", env("AI_SUMMARY_QUEUE_NAME", `${workerName}-tasks`)) ?? `${workerName}-tasks`;
+  const customDomain = env("CUSTOM_DOMAIN", "");
   const r2BucketName = env("R2_BUCKET_NAME", "");
   const s3Endpoint = env("S3_ENDPOINT", "");
   const s3AccessHost = env("S3_ACCESS_HOST", "");
@@ -183,6 +178,10 @@ export async function runCloudflareDeploy(target: "all" | "server" | "client" = 
   const hasServerBuild = await serverDistIndex.exists();
   const serverMain = hasServerBuild ? "dist/server/_worker.js" : "server/src/_worker.ts";
 
+  const customDomainBlock = customDomain
+    ? `\n[[custom_domains]]\nhostname = "${customDomain}"\n`
+    : "";
+
   Bun.write(
     "wrangler.toml",
     stripIndent(`
@@ -217,7 +216,7 @@ export async function runCloudflareDeploy(target: "all" | "server" | "client" = 
 
       [placement]
       mode = "smart"
-    `),
+    `) + customDomainBlock,
   );
 
   const { exitCode, stderr, stdout } = await $`${bunExec} x wrangler d1 create ${dbName}`.quiet().nothrow();

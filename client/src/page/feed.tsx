@@ -13,7 +13,6 @@ import { client } from "../app/runtime";
 import { ClientConfigContext } from "../state/config";
 import { ProfileContext } from "../state/profile";
 import { useSiteConfig } from "../hooks/useSiteConfig";
-import { siteName } from "../utils/constants";
 import { timeago } from "../utils/timeago";
 import { Button } from "../components/button";
 import { Tips } from "../components/tips";
@@ -46,7 +45,6 @@ export function FeedPage({ id, TOC, clean }: { id: string, TOC: () => JSX.Elemen
   const counterEnabled = config.getBoolean('counter.enabled');
   const hasAISummary = Boolean(feed?.ai_summary?.trim());
   const showAISummaryState = feed?.ai_summary_status === "pending" || feed?.ai_summary_status === "processing" || feed?.ai_summary_status === "failed";
-  const hashtags = Array.isArray(feed?.hashtags) ? feed.hashtags : [];
   function deleteFeed() {
     // Confirm
     showConfirm(
@@ -131,36 +129,34 @@ export function FeedPage({ id, TOC, clean }: { id: string, TOC: () => JSX.Elemen
     })
   }, [feed]);
 
+  const feedDescription = feed
+    ? feed.summary?.trim() || (feed.content.length > 200 ? `${feed.content.substring(0, 200)}…` : feed.content)
+    : "";
+  const canonicalUrl = feed && typeof window !== "undefined"
+    ? `${window.location.origin}/${feed.alias || feed.id}`
+    : "";
+
   return (
     <Waiting for={feed || error}>
       {feed && (
         <Helmet>
           <title>{`${feed.title ?? "Unnamed"} - ${siteConfig.name}`}</title>
-          <meta property="og:site_name" content={siteName} />
+          <meta name="description" content={feedDescription} />
+          <link rel="canonical" href={canonicalUrl} />
+          <meta property="og:site_name" content={siteConfig.name} />
           <meta property="og:title" content={feed.title ?? ""} />
+          <meta property="og:description" content={feedDescription} />
           <meta property="og:image" content={headImage ?? siteConfig.avatar} />
           <meta property="og:type" content="article" />
-          <meta property="og:url" content={document.URL} />
-          <meta
-            name="og:description"
-            content={
-              feed.content.length > 200
-                ? feed.content.substring(0, 200)
-                : feed.content
-            }
-          />
+          <meta property="og:url" content={canonicalUrl} />
+          <meta name="twitter:card" content="summary_large_image" />
+          <meta name="twitter:title" content={feed.title ?? ""} />
+          <meta name="twitter:description" content={feedDescription} />
+          <meta name="twitter:image" content={headImage ?? siteConfig.avatar} />
           <meta name="author" content={feed.user.username} />
           <meta
             name="keywords"
-            content={hashtags.map(({ name }) => name).join(", ")}
-          />
-          <meta
-            name="description"
-            content={
-              feed.content.length > 200
-                ? feed.content.substring(0, 200)
-                : feed.content
-            }
+            content={feed.hashtags.map(({ name }) => name).join(", ")}
           />
         </Helmet>
       )}
@@ -283,9 +279,9 @@ export function FeedPage({ id, TOC, clean }: { id: string, TOC: () => JSX.Elemen
                 )}
                 <Markdown content={feed.content} />
                 <div className="mt-6 flex flex-col gap-2">
-                  {hashtags.length > 0 && (
+                  {feed.hashtags.length > 0 && (
                     <div className="flex flex-row flex-wrap gap-x-2">
-                      {hashtags.map(({ name }, index) => (
+                      {feed.hashtags.map(({ name }, index) => (
                         <HashTag key={index} name={name} />
                       ))}
                     </div>

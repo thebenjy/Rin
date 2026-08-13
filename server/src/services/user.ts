@@ -4,6 +4,7 @@ import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import type { AppContext } from "../core/hono-types";
 import { profileAsync } from "../core/server-timing";
 import { setJWTCookie } from "../core/hono-middleware";
+import { setTrackingExclusionCookie } from "../utils/tracking-exclusion";
 import { users } from "../db/schema";
 import {
     BadRequestError,
@@ -109,6 +110,7 @@ export function UserService(): Hono {
             await profileAsync(c, 'user_existing_update', () => db.update(users).set(profile).where(eq(users.id, existingUser.id)));
             authToken = await profileAsync(c, 'user_existing_token', () => jwt.sign({ id: existingUser.id }));
             setJWTCookie(c, authToken);
+            setTrackingExclusionCookie(c);
             // Store token in cookie for frontend to read (not HttpOnly)
             setCookie(c, 'auth_token', authToken, {
                 expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7),
@@ -129,6 +131,7 @@ export function UserService(): Hono {
 
             authToken = await profileAsync(c, 'user_insert_token', () => jwt.sign({ id: result[0].insertedId }));
             setJWTCookie(c, authToken);
+            setTrackingExclusionCookie(c);
             // Store token in cookie for frontend to read (not HttpOnly)
             setCookie(c, 'auth_token', authToken, {
                 expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7),

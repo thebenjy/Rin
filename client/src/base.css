@@ -35,7 +35,7 @@
     }
   
     .wauto {
-      @apply w-full md:w-11/12 lg:w-10/12 xl:w-8/12 2xl:w-6/12 duration-300;
+      @apply w-full xl:w-10/12 2xl:w-[62.5%] duration-300;
     }
   
     .writeauto {

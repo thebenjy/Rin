@@ -125,7 +125,7 @@ export function WritingPage({ id }: { id?: number }) {
   const [summary, setSummary] = cache.useCache("summary", "");
   const [tags, setTags] = cache.useCache("tags", "");
   const [alias, setAlias] = cache.useCache("alias", "");
-  const [draft, setDraft] = useState(false);
+  const [draft, setDraft] = useState(true);
   const [listed, setListed] = useState(true);
   const [content, setContent] = cache.useCache("content", "");
   const [createdAt, setCreatedAt] = useState<Date | undefined>(new Date());
@@ -189,7 +189,7 @@ export function WritingPage({ id }: { id?: number }) {
         .then(({ data }) => {
           if (data) {
             if (title == "" && data.title) setTitle(data.title);
-            if (tags == "" && Array.isArray(data.hashtags))
+            if (tags == "" && data.hashtags)
               setTags(data.hashtags.map(({ name }: {name: string}) => `#${name}`).join(" "));
             if (alias == "" && (data as any).alias) setAlias((data as any).alias);
             if (content == "") setContent(data.content);
@@ -292,7 +292,7 @@ export function WritingPage({ id }: { id?: number }) {
               className="cursor-pointer rounded-none border-0 bg-transparent px-0 py-2 sm:rounded-2xl sm:border sm:bg-secondary sm:px-4 sm:py-3"
               onClick={() => setDraft(!draft)}
             >
-              <p>{t('visible.self_only')}</p>
+              <p>{t('draft')}</p>
               <Checkbox
                 id="draft"
                 value={draft}

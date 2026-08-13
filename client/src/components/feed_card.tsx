@@ -13,7 +13,7 @@ function FeedCardImage({ src, variant }: { src: string; variant: FeedCardVariant
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const { src: cleanSrc, blurhash, width, height } = parseImageUrlMetadata(src);
     const { failed, imageRef, loaded, onError, onLoad } = useImageLoadState(cleanSrc);
-    const aspectRatio = width && height ? `${width} / ${height}` : "16 / 9";
+    const aspectRatio = width && height ? `${width} / ${height}` : undefined;
     const imageFrameClass =
         variant === "editorial"
             ? "relative flex max-h-80 w-full flex-row items-center overflow-hidden rounded-[20px]"
@@ -33,7 +33,7 @@ function FeedCardImage({ src, variant }: { src: string; variant: FeedCardVariant
     return (
         <div
             className={imageFrameClass}
-            style={{ aspectRatio: aspectRatio || '16 / 9' }}
+            style={{ aspectRatio }}
         >
             {blurhash && !loaded ? (
                 <canvas
@@ -70,38 +70,38 @@ const FEED_CARD_STYLES: Record<
     default: {
         card: "my-2 inline-block w-full break-inside-avoid rounded-2xl bg-w p-6 duration-300 bg-button",
         imageWrap: "",
-        meta: "text-gray-400 text-sm",
-        summary: "line-clamp-4 text-pretty overflow-hidden dark:text-neutral-500",
-        title: "text-xl font-bold text-gray-700 dark:text-white text-pretty overflow-hidden",
+        meta: "text-gray-400 text-[0.65625rem]",
+        summary: "line-clamp-4 text-pretty overflow-hidden dark:text-neutral-500 text-xs",
+        title: "text-[0.9375rem] font-bold text-gray-700 dark:text-white text-pretty overflow-hidden",
     },
     editorial: {
         card: "my-3 inline-block w-full break-inside-avoid overflow-hidden rounded-[28px] border border-black/10 bg-w p-3 shadow-[0_24px_60px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-0.5 hover:shadow-[0_28px_70px_rgba(15,23,42,0.12)] dark:border-white/10",
         imageWrap: "mb-3 overflow-hidden rounded-[22px] border border-black/5 dark:border-white/10",
-        meta: "text-[12px] font-medium uppercase tracking-[0.18em] text-neutral-500 dark:text-neutral-400",
-        summary: "line-clamp-5 text-pretty text-[15px] leading-7 text-neutral-600 dark:text-neutral-300",
-        title: "text-2xl font-semibold tracking-[-0.02em] text-neutral-900 dark:text-white text-pretty overflow-hidden",
+        meta: "text-[9px] font-medium uppercase tracking-[0.18em] text-neutral-500 dark:text-neutral-400",
+        summary: "line-clamp-5 text-pretty text-[11.25px] leading-7 text-neutral-600 dark:text-neutral-300",
+        title: "text-lg font-semibold tracking-[-0.02em] text-neutral-900 dark:text-white text-pretty overflow-hidden",
     },
 };
 
 export type FeedCardProps = {
     id: string;
+    alias?: string | null;
     avatar?: string;
     draft?: number;
     listed?: number;
     top?: number;
     title: string;
     summary: string;
-    hashtags?: { id: number, name: string }[];
+    hashtags: { id: number, name: string }[];
     createdAt: Date;
     updatedAt: Date;
     preview?: boolean;
     variant?: FeedCardVariant;
 };
 
-export function FeedCard({ id, title, avatar, draft, listed, top, summary, hashtags, createdAt, updatedAt, preview = false, variant }: FeedCardProps) {
+export function FeedCard({ id, alias, title, avatar, draft, listed, top, summary, hashtags, createdAt, updatedAt, preview = false, variant }: FeedCardProps) {
     const { t } = useTranslation();
     const siteConfig = useSiteConfig();
-    const safeHashtags = Array.isArray(hashtags) ? hashtags : [];
     const activeVariant = normalizeFeedCardVariant(variant ?? siteConfig.feedCardVariant);
     const styles = FEED_CARD_STYLES[activeVariant];
     const body = (
@@ -128,10 +128,10 @@ export function FeedCard({ id, title, avatar, draft, listed, top, summary, hasht
                     {listed === 0 && <span>{t("unlisted")}</span>}
                     {top === 1 && <span className="text-theme">{t('article.top.title')}</span>}
                 </p>
-                <p className={`whitespace-pre-line ${styles.summary} ${activeVariant === "editorial" ? "mt-4 max-w-3xl" : ""}`}>{summary}</p>
-                {safeHashtags.length > 0 &&
+                <p className={`${styles.summary} ${activeVariant === "editorial" ? "mt-4 max-w-3xl" : ""}`}>{summary}</p>
+                {hashtags.length > 0 &&
                     <div className={`flex flex-row flex-wrap justify-start gap-2 ${activeVariant === "editorial" ? "mt-4" : "mt-2 gap-x-2"}`}>
-                        {safeHashtags.map(({ name }, index) => (
+                        {hashtags.map(({ name }, index) => (
                             <HashTag key={index} name={name} />
                         ))}
                     </div>
@@ -140,5 +140,5 @@ export function FeedCard({ id, title, avatar, draft, listed, top, summary, hasht
         </div>
     );
 
-    return preview ? body : <Link href={`/feed/${id}`} target="_blank" className="block w-full">{body}</Link>;
+    return preview ? body : <Link href={`/${alias || id}`} target="_blank" className="block w-full">{body}</Link>;
 }

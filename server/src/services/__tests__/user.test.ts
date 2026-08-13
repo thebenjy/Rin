@@ -167,6 +167,17 @@ describe('UserService', () => {
                 expect(res.status).toBe(302);
                 const location = res.headers.get('Location');
                 expect(location).toContain('/callback');
+
+                const cookies = res.headers.getSetCookie();
+                expect(cookies.some((c) => c.startsWith('token='))).toBe(true);
+                const trackingCookie = cookies.find((c) => c.startsWith('fs_internal_notrack='));
+                expect(trackingCookie).toBeDefined();
+                expect(trackingCookie).toContain('Domain=.food-signals.com');
+                expect(trackingCookie).toContain('Path=/');
+                expect(trackingCookie).toContain('Secure');
+                expect(trackingCookie).toContain('SameSite=Lax');
+                expect(trackingCookie).toContain('Max-Age=15552000');
+                expect(trackingCookie).not.toContain('HttpOnly');
             } finally {
                 global.fetch = originalFetch;
             }
