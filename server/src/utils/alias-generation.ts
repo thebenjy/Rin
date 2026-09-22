@@ -1,4 +1,4 @@
-import { like } from "drizzle-orm";
+import { isNotNull } from "drizzle-orm";
 import type { DB } from "../core/hono-types";
 import { feeds } from "../db/schema";
 import { slugify } from "./slugify";
@@ -13,6 +13,14 @@ const MAX_COLLISION_ATTEMPTS = 50;
  * behaviour (`/${id}`) rather than store a bad value.
  *
  * `excludeId` lets an update check for collisions without matching its own row.
+ *
+ * Collision matching is done in JS against every stored alias, not a
+ * `LIKE '<slug>%'` query: Cloudflare D1 rejects a LIKE pattern once the literal
+ * prefix passes ~50 characters ("LIKE or GLOB pattern too complex", SQLITE_ERROR
+ * 7500) — a limit local bun:sqlite does not enforce, so it passed every local test
+ * and only surfaced against production. A slug can be up to 60 chars (slugify's own
+ * cap), so it could always exceed that threshold. Fetching all aliases avoids the
+ * limit entirely and is cheap at this blog's scale (tens to low hundreds of posts).
  */
 export async function generateUniqueAlias(
   db: DB,
@@ -25,7 +33,7 @@ export async function generateUniqueAlias(
   }
 
   const existing = await db.query.feeds.findMany({
-    where: like(feeds.alias, `${base}%`),
+    where: isNotNull(feeds.alias),
     columns: { id: true, alias: true },
   });
 

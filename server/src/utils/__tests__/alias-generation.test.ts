@@ -1,5 +1,6 @@
 import { describe, expect, it, afterEach } from "bun:test";
 import { generateUniqueAlias } from "../alias-generation";
+import { slugify } from "../slugify";
 import { createMockDB, cleanupTestDB, createTestUser } from "../../../tests/fixtures";
 
 describe("generateUniqueAlias", () => {
@@ -68,5 +69,23 @@ describe("generateUniqueAlias", () => {
     it("returns null for a title with no usable characters", async () => {
         const db = setup();
         expect(await generateUniqueAlias(db, "🎉🎊")).toBeNull();
+    });
+
+    // Regression test for a bug caught only in production: Cloudflare D1 rejects a
+    // LIKE pattern once its literal prefix passes ~50 characters ("LIKE or GLOB
+    // pattern too complex", SQLITE_ERROR 7500) — local bun:sqlite does not enforce
+    // this, so an earlier implementation using `like(feeds.alias, base + '%')`
+    // passed every test here and broke the first real publish against D1. Doesn't
+    // reproduce the D1-specific error locally (bun:sqlite has no such limit), but
+    // guards the fix: collision-checking must not depend on alias length.
+    it("resolves a collision for a long, 50+ character slug", async () => {
+        const db = setup();
+        const longTitle = "This Title Is Long Enough To Exceed Fifty Characters Once Slugified";
+        const base = slugify(longTitle)!;
+        expect(base.length).toBeGreaterThan(50);
+        sqlite.exec(`INSERT INTO feeds (id, alias, title, content, uid, draft, listed)
+                     VALUES (1, '${base}', 'x', 'x', 1, 0, 1)`);
+        const alias = await generateUniqueAlias(db, longTitle);
+        expect(alias).toBe(`${base}-2`);
     });
 });
