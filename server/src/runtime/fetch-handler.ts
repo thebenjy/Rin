@@ -1,5 +1,7 @@
 import { getApp } from "./app-instance";
 import { buildHeadInjection } from "./seo-meta";
+import { buildIndexBodyInjection } from "./index-fragment";
+import { shouldHideUnpublishedPost } from "./post-visibility";
 
 const ROOT_FEED_PATTERN = /^\/(rss\.xml|atom\.xml|rss\.json|feed\.json|feed\.xml|sitemap\.xml)$/;
 const APP_PUBLIC_ROUTE_PATTERN = /^\/(favicon|favicon\.ico)(?:\/|$)/;
@@ -64,13 +66,27 @@ async function injectSeoHead(response: Response, request: Request, env: Env) {
   }
 
   try {
-    const headMarkup = await buildHeadInjection(request, env);
-    if (!headMarkup) {
+    const [headMarkup, bodyMarkup] = await Promise.all([
+      buildHeadInjection(request, env),
+      buildIndexBodyInjection(request, env),
+    ]);
+
+    if (!headMarkup && !bodyMarkup) {
       return response;
     }
 
     const html = await response.text();
-    const injected = html.replace("</head>", `${headMarkup}</head>`);
+    let injected = headMarkup ? html.replace("</head>", `${headMarkup}</head>`) : html;
+
+    // No-op if the shell ever stops emitting this exact string (a build change could
+    // alter it) rather than corrupting the document.
+    if (bodyMarkup) {
+      injected = injected.replace(
+        '<div id="root"></div>',
+        `<div id="root">${bodyMarkup}</div>`,
+      );
+    }
+
     const headers = new Headers(response.headers);
     headers.delete("content-length");
 
@@ -103,8 +119,19 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
     }
   }
 
+  // Unpublished posts still render the SPA shell (so the app shows its own not-found
+  // page) but answer 404, and the shell carries none of the draft's text. Staff with a
+  // valid session keep preview access.
+  const hideUnpublished = await shouldHideUnpublishedPost(request, env);
+
   const indexResponse = await serveSpaEntry(request, env);
   if (indexResponse) {
+    if (hideUnpublished) {
+      return new Response(indexResponse.body, {
+        status: 404,
+        headers: indexResponse.headers,
+      });
+    }
     return indexResponse;
   }
 

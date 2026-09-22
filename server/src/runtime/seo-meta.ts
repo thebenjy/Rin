@@ -3,6 +3,7 @@ import { eq, or } from "drizzle-orm";
 import { getClientConfigWithDefaults } from "../services/config-helpers";
 import { CacheImpl } from "../utils/cache";
 import { extractImage } from "../utils/image";
+import { canonicalUrlForPost } from "../utils/canonical";
 
 const STATIC_ROUTE_TITLES: Record<string, string> = {
   "/timeline": "Timeline",
@@ -12,6 +13,25 @@ const STATIC_ROUTE_TITLES: Record<string, string> = {
 };
 
 const SKIPPED_PREFIXES = ["/admin", "/callback", "/login", "/profile", "/user"];
+
+// Minimal head for routes that must never be indexed and need no site config.
+const NOINDEX_ONLY_HEAD = '<meta name="robots" content="noindex, nofollow">';
+
+/** True for auth/admin/profile routes, which must never be indexed. */
+export function isUtilityRoute(pathname: string): boolean {
+  return SKIPPED_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
+/**
+ * Robots value for a list page. The index is the blog's entry point and stays
+ * indexable; the engine's template routes (/timeline, /moments, /friends, /hashtags)
+ * and the hashtag/search listings are navigation furniture and are excluded — they are
+ * dropped from the sitemap too (sitemap.ts STATIC_PATHS), and the two must agree.
+ * `undefined` means "use the default", which baseTags renders as index, follow.
+ */
+export function robotsForListPage(pathname: string): string | undefined {
+  return pathname === "/" ? undefined : "noindex, nofollow";
+}
 
 function escapeHtml(value: string): string {
   return value
@@ -92,8 +112,13 @@ export async function buildHeadInjection(request: Request, env: Env): Promise<st
   const origin = url.origin;
   const pathname = url.pathname;
 
-  if (SKIPPED_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
-    return "";
+  // Utility routes (auth, admin console, profiles). Returning "" here used to mean no
+  // robots meta was emitted at all — and absent means indexable. robots.txt only
+  // disallows /admin/ and /api/, so /login, /profile, /user and /callback were
+  // crawlable and indexable. Emit an explicit noindex instead; these never carry
+  // content worth indexing. No DB access needed, so this stays a cheap early return.
+  if (isUtilityRoute(pathname)) {
+    return NOINDEX_ONLY_HEAD;
   }
 
   const schema = await import("../db/schema");
@@ -125,6 +150,7 @@ export async function buildHeadInjection(request: Request, env: Env): Promise<st
       url: `${origin}${pathname}`,
       siteName,
       type: "website",
+      robots: robotsForListPage(pathname),
     });
 
     if (pathname !== "/") {
@@ -179,7 +205,7 @@ export async function buildHeadInjection(request: Request, env: Env): Promise<st
     });
   }
 
-  const canonicalUrl = `${origin}${post.alias ? `/${post.alias}` : `/feed/${post.id}`}`;
+  const canonicalUrl = canonicalUrlForPost(origin, post);
   const title = post.title ? `${post.title} - ${siteName}` : siteName;
   const description = post.summary.trim() || (post.content ? excerptFromMarkdown(post.content) : siteDescription);
   const image = extractImage(post.content) || siteAvatar;

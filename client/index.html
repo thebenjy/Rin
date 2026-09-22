@@ -21,9 +21,16 @@
          content/term/qr/ref/fbclid/gclid already in the shared fs_attr cookie by the time they
          click through to food-signals.com, where EmailCTA/LandingPageForm read it via
          window.FSAttribution.get() for the sign_up/lead events. First-touch-wins: never
-         overwrites a value already captured on either domain. Requires blog.food-signals.com
-         to be in GA4's cross-domain measurement list (Data Streams > Configure your domains)
-         so the hop doesn't split into a new session / self-referral. -->
+         overwrites a value already captured on either domain.
+
+         NOTE: no GA4 cross-domain measurement configuration is needed here, and an earlier
+         version of this comment wrongly said it was required. Cross-domain measurement
+         stitches sessions across different *registrable* domains by decorating links with
+         _gl. blog.food-signals.com and food-signals.com share the registrable domain
+         food-signals.com, so GA4's _ga cookie (cookie_domain: auto) already spans both
+         hosts, as does the fs_attr cookie set below with Domain=food-signals.com. The hop
+         carries the same client ID with no configuration. Verified 2026-09-22: no
+         self-referral rows for either host in 60 days of GA4 session sources. -->
     <script>
       (function () {
         if (window.__RIN_EXCLUDE_TRACKING__()) return;

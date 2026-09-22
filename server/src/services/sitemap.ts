@@ -2,8 +2,12 @@ import { and, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import type { AppContext } from "../core/hono-types";
 import { feeds } from "../db/schema";
+import { canonicalUrlForPost } from "../utils/canonical";
 
-const STATIC_PATHS = ["/", "/timeline", "/moments", "/hashtags", "/friends"];
+// Only the index. /timeline, /moments, /hashtags and /friends are Rin engine
+// furniture, not content — they are served noindex (see seo-meta.ts) and must not
+// be advertised here, or the sitemap tells Google to index what the pages refuse.
+const STATIC_PATHS = ["/"];
 
 function escapeXml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -29,7 +33,7 @@ export function SitemapService(): Hono {
 
     const urls = [
       ...STATIC_PATHS.map((path) => urlEntry(`${origin}${path}`)),
-      ...posts.map((post) => urlEntry(`${origin}/${post.alias || post.id}`, post.updatedAt)),
+      ...posts.map((post) => urlEntry(canonicalUrlForPost(origin, post), post.updatedAt)),
     ];
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.join("")}</urlset>`;
