@@ -81,6 +81,23 @@ export function buildR2BucketInfo(r2BucketName: string, accountId: string): R2Bu
   };
 }
 
+// Without run_worker_first for "/", Cloudflare serves that exact static-asset path
+// (dist/client/index.html) directly from asset storage and never invokes the Worker's
+// fetch() — silently skipping buildHeadInjection/buildIndexBodyInjection for the
+// homepage. Every route with no matching static file (a post id, /timeline, ...) is
+// unaffected and already reaches the Worker regardless. Scoped to "/" only so every
+// other static asset (JS/CSS/images) keeps bypassing the Worker, matching setup-dev.ts's
+// local-dev config (which uses run_worker_first = true — fine there since dev has no
+// asset-serving traffic worth optimising for).
+export function buildWranglerAssetsConfig() {
+  return stripIndent(`
+    [assets]
+    directory = "./dist/client"
+    binding = "ASSETS"
+    run_worker_first = ["/"]
+  `);
+}
+
 export function buildWranglerTriggersConfig(preview = false) {
   return preview
     ? ""
@@ -190,9 +207,7 @@ export async function runCloudflareDeploy(target: "all" | "server" | "client" = 
       main = "${serverMain}"
       compatibility_date = "2026-01-20"
 
-      [assets]
-      directory = "./dist/client"
-      binding = "ASSETS"
+      ${buildWranglerAssetsConfig()}
       ${buildWranglerTriggersConfig(preview)}
       ${buildWranglerObservabilityConfig(preview)}
 

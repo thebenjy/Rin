@@ -32,6 +32,7 @@ describe("resolvePostVisibility — route classification", () => {
     });
 });
 
+
 describe("hasValidSession", () => {
     it("is false with no token at all", async () => {
         expect(await hasValidSession(req("/5"), ENV)).toBe(false);

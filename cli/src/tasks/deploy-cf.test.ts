@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  buildWranglerAssetsConfig,
   buildWranglerObservabilityConfig,
   buildWranglerQueueConfig,
   buildWranglerTriggersConfig,
@@ -40,6 +41,28 @@ describe("collectWorkerSecrets", () => {
     expect(secrets).toEqual({
       ADMIN_PASSWORD: "password",
     });
+  });
+});
+
+describe("buildWranglerAssetsConfig", () => {
+  // Regression guard: without run_worker_first, a request to the literal "/" is
+  // served directly from Cloudflare asset storage, bypassing the Worker's fetch()
+  // entirely, so the homepage's SEO head injection and crawlable-index fragment
+  // silently never run — found only by testing a live deploy (2026-09-22).
+  it("scopes run_worker_first to the homepage only", () => {
+    const config = buildWranglerAssetsConfig();
+    expect(config).toContain('run_worker_first = ["/"]');
+  });
+
+  it("does not route every request through the Worker", () => {
+    const config = buildWranglerAssetsConfig();
+    expect(config).not.toContain("run_worker_first = true");
+  });
+
+  it("declares the assets directory and binding", () => {
+    const config = buildWranglerAssetsConfig();
+    expect(config).toContain('directory = "./dist/client"');
+    expect(config).toContain('binding = "ASSETS"');
   });
 });
 

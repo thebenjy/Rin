@@ -88,10 +88,20 @@ export async function resolvePostVisibility(request: Request, env: Env): Promise
   };
 }
 
-/** Serve 404 for an unpublished post unless the caller is staff previewing it. */
+/**
+ * Serve 404 for a post URL that has no publicly-visible content behind it — either a
+ * post that exists but is draft/unlisted, or an id/alias with no row at all — unless
+ * the caller is staff (who may be previewing a draft; there is nothing to preview for
+ * a nonexistent id, but the check is harmless and keeps the rule uniform).
+ *
+ * Checked against production data (2026-09-22): the blog has never actually had a
+ * draft or unlisted row — every post is published. The ids this was written to guard
+ * (7, 8, 12) turned out to be gaps with no row at all, not hidden drafts. Handling
+ * "not found" here as well as "found but unpublished" is what actually fixes them.
+ */
 export async function shouldHideUnpublishedPost(request: Request, env: Env): Promise<boolean> {
   const visibility = await resolvePostVisibility(request, env);
-  if (!visibility.isPostRoute || !visibility.found || visibility.published) {
+  if (!visibility.isPostRoute || visibility.published) {
     return false;
   }
   return !(await hasValidSession(request, env));
