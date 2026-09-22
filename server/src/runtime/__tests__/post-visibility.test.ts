@@ -71,3 +71,18 @@ describe("hasValidSession", () => {
         expect(await hasValidSession(req("/5", { headers: { cookie } }), ENV)).toBe(true);
     });
 });
+
+describe("route reservation stays in sync with the alias reservation", () => {
+    // NON_POST_PREFIXES/NON_POST_EXACT (route matching) and RESERVED_ALIASES (alias
+    // validity) are two lists by necessity — see the comment above NON_POST_PREFIXES
+    // — but every bare word one encodes must appear in the other, or a title could
+    // generate an alias that silently collides with an engine route (or vice versa,
+    // a route gets added here without also blocking it as an alias).
+    it("every reserved route name is also a reserved alias", async () => {
+        const { RESERVED_ALIASES } = await import("../../utils/canonical");
+        const routeWords = ["admin", "callback", "login", "profile", "user", "timeline", "moments", "friends", "hashtags"];
+        for (const word of routeWords) {
+            expect(RESERVED_ALIASES.has(word)).toBe(true);
+        }
+    });
+});

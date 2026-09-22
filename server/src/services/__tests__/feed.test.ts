@@ -319,6 +319,84 @@ describe('FeedService', () => {
         });
     });
 
+    describe('POST / - Create feed generates an alias from the title', () => {
+        it('stores a title-derived alias when none is supplied', async () => {
+            const res = await app.request('/', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer mock_token_1',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    title: 'Waking up with heartburn on Ozempic?',
+                    content: 'Content',
+                    listed: true,
+                    draft: false,
+                    tags: [],
+                }),
+            }, env);
+
+            expect(res.status).toBe(200);
+            const data = await res.json() as any;
+            const getRes = await app.request(`/${data.insertedId}`, { method: 'GET' }, env);
+            const feed = await getRes.json() as any;
+            expect(feed.alias).toBe('waking-up-with-heartburn-on-ozempic');
+        });
+
+        it('uses a supplied alias verbatim instead of generating one', async () => {
+            const res = await app.request('/', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer mock_token_1',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    title: 'A Title',
+                    alias: 'my-own-slug',
+                    content: 'Content',
+                    listed: true,
+                    draft: false,
+                    tags: [],
+                }),
+            }, env);
+
+            const data = await res.json() as any;
+            const getRes = await app.request(`/${data.insertedId}`, { method: 'GET' }, env);
+            const feed = await getRes.json() as any;
+            expect(feed.alias).toBe('my-own-slug');
+        });
+
+        it('disambiguates two posts whose titles would slugify the same', async () => {
+            const create = (title: string, content: string) => app.request('/', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer mock_token_1', 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, content, listed: true, draft: false, tags: [] }),
+            }, env);
+
+            const first = await (await create('Ozempic Basics', 'First post content')).json() as any;
+            const second = await (await create('Ozempic Basics!', 'Second post content')).json() as any;
+
+            const firstFeed = await (await app.request(`/${first.insertedId}`, { method: 'GET' }, env)).json() as any;
+            const secondFeed = await (await app.request(`/${second.insertedId}`, { method: 'GET' }, env)).json() as any;
+
+            expect(firstFeed.alias).toBe('ozempic-basics');
+            expect(secondFeed.alias).toBe('ozempic-basics-2');
+        });
+
+        it('falls back to no alias when the title slugifies to a reserved route name', async () => {
+            const res = await app.request('/', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer mock_token_1', 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: 'Login', content: 'Content', listed: true, draft: false, tags: [] }),
+            }, env);
+
+            const data = await res.json() as any;
+            const getRes = await app.request(`/${data.insertedId}`, { method: 'GET' }, env);
+            const feed = await getRes.json() as any;
+            expect(feed.alias).toBeFalsy();
+        });
+    });
+
     describe('POST /:id - Update feed', () => {
         it('should update feed with admin permission', async () => {
             // Create feed first
@@ -393,6 +471,74 @@ describe('FeedService', () => {
             }, env);
 
             expect(updateRes.status).toBe(403);
+        });
+    });
+
+    describe('POST /:id - Update feed does not disturb an existing alias', () => {
+        it('keeps a title-generated alias when a later save changes the title but omits the alias field', async () => {
+            const createRes = await app.request('/', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer mock_token_1', 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: 'Original Heartburn Title',
+                    content: 'Content',
+                    listed: true,
+                    draft: false,
+                    tags: [],
+                }),
+            }, env);
+            const feedId = (await createRes.json() as any).insertedId;
+
+            const original = await (await app.request(`/${feedId}`, { method: 'GET' }, env)).json() as any;
+            expect(original.alias).toBe('original-heartburn-title');
+
+            await app.request(`/${feedId}`, {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer mock_token_1', 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: 'A Completely Different Title', listed: true }),
+            }, env);
+
+            const updated = await (await app.request(`/${feedId}`, { method: 'GET' }, env)).json() as any;
+            expect(updated.alias).toBe('original-heartburn-title');
+        });
+
+        it('keeps an author-supplied alias across an unrelated update', async () => {
+            const createRes = await app.request('/', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer mock_token_1', 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: 'A Title', alias: 'hand-picked-slug', content: 'Content', listed: true, draft: false, tags: [],
+                }),
+            }, env);
+            const feedId = (await createRes.json() as any).insertedId;
+
+            await app.request(`/${feedId}`, {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer mock_token_1', 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: 'A Title', summary: 'now with a summary', listed: true }),
+            }, env);
+
+            const updated = await (await app.request(`/${feedId}`, { method: 'GET' }, env)).json() as any;
+            expect(updated.alias).toBe('hand-picked-slug');
+        });
+
+        it('generates an alias on update for a post that has never had one', async () => {
+            const createRes = await app.request('/', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer mock_token_1', 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: 'Login', content: 'Content', listed: true, draft: false, tags: [] }),
+            }, env);
+            const feedId = (await createRes.json() as any).insertedId;
+            expect((await (await app.request(`/${feedId}`, { method: 'GET' }, env)).json() as any).alias).toBeFalsy();
+
+            await app.request(`/${feedId}`, {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer mock_token_1', 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: 'A Proper Title Now', listed: true }),
+            }, env);
+
+            const updated = await (await app.request(`/${feedId}`, { method: 'GET' }, env)).json() as any;
+            expect(updated.alias).toBe('a-proper-title-now');
         });
     });
 

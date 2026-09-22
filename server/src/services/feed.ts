@@ -8,6 +8,7 @@ import { extractImageWithMetadata } from "../utils/image";
 import { syncFeedAISummaryQueueState } from "./feed-ai-summary";
 import { bindTagToPost } from "./tag";
 import { clearFeedCache } from "./clear-feed-cache";
+import { generateUniqueAlias, resolveAliasForSave } from "../utils/alias-generation";
 export { clearFeedCache } from "./clear-feed-cache";
 
 // Lazy-loaded modules for WordPress import
@@ -156,6 +157,17 @@ export function FeedService(): Hono<{
             return c.text('User ID is required', 400);
         }
 
+        // No alias supplied → derive one from the title so the post gets a
+        // keyword-carrying URL without the author needing to know URL conventions.
+        // A supplied alias always wins (resolveAliasForSave); there is no existing
+        // row yet on create, so that branch never applies here.
+        const resolvedAlias = await profileAsync(c, 'feed_create_resolve_alias', () => resolveAliasForSave(
+            null,
+            alias,
+            title,
+            (t) => generateUniqueAlias(db, t),
+        ));
+
         const result = await profileAsync(c, 'feed_create_insert', () => db.insert(feeds).values({
             title,
             content,
@@ -164,7 +176,7 @@ export function FeedService(): Hono<{
             ai_summary_status: "idle",
             ai_summary_error: "",
             uid,
-            alias,
+            alias: resolvedAlias,
             listed: listed ? 1 : 0,
             draft: draft ? 1 : 0,
             createdAt: date,
@@ -394,6 +406,18 @@ export function FeedService(): Hono<{
         const shouldQueueAISummary = (contentChanged && !isDraft) || (!isDraft && feed.draft === 1 && !feed.ai_summary);
         const updateTime = new Date();
 
+        // The stored alias (feed.alias) always wins over generating a new one — a
+        // save that omits the alias field must never silently replace an existing
+        // or previously-generated slug. Only a post that has never had an alias, and
+        // still doesn't in this save, gets one generated — from the incoming title
+        // if this save changes it, else the title already on file.
+        const resolvedAlias = await profileAsync(c, 'feed_update_resolve_alias', () => resolveAliasForSave(
+            feed.alias,
+            alias,
+            title ?? feed.title ?? '',
+            (t) => generateUniqueAlias(db, t, { excludeId: id_num }),
+        ));
+
         await profileAsync(c, 'feed_update_db', () => db.update(feeds).set({
             title,
             content,
@@ -401,7 +425,7 @@ export function FeedService(): Hono<{
             ai_summary: shouldQueueAISummary ? "" : undefined,
             ai_summary_status: isDraft ? "idle" : undefined,
             ai_summary_error: shouldQueueAISummary || isDraft ? "" : undefined,
-            alias,
+            alias: resolvedAlias,
             top,
             listed: listed ? 1 : 0,
             draft: draft === undefined ? undefined : draft ? 1 : 0,

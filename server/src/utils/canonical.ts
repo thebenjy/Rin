@@ -10,6 +10,30 @@ export interface CanonicalPostRef {
   alias?: string | null;
 }
 
+// Route names an alias must never equal — they'd make a post unreachable (shadowed by
+// the engine route of the same name) or ambiguous with an id lookup. Previously
+// duplicated between post-visibility.ts's NON_POST_PREFIXES/NON_POST_EXACT and the
+// authoring guide's own "never use these words" list; centralised here since this is
+// the module that owns what a post's URL is allowed to be.
+export const RESERVED_ALIASES: ReadonlySet<string> = new Set([
+  "timeline",
+  "moments",
+  "friends",
+  "hashtags",
+  "login",
+  "profile",
+  "search",
+  "feed",
+  "admin",
+  "callback",
+  "user",
+]);
+
+/** True for a value that would collide with an engine route or a raw id lookup. */
+export function isReservedAlias(value: string): boolean {
+  return RESERVED_ALIASES.has(value) || /^\d+$/.test(value);
+}
+
 /** Public path for a post: its alias when set, otherwise its id. Always leading-slash. */
 export function canonicalPathForPost(post: CanonicalPostRef): string {
   const alias = post.alias?.trim();

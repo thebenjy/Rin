@@ -10,6 +10,10 @@ import createJWT from "../utils/jwt";
 // is staff, so the fetch handler can answer 404 to everyone else.
 
 // Mirrors the route shapes seo-meta.ts recognises: these never identify a post.
+// The bare words here (without the leading "/") are also RESERVED_ALIASES in
+// canonical.ts, which the alias generator refuses to assign — kept as two lists
+// because this one encodes routing shape (prefix vs. exact) that an alias, always a
+// single path segment, has no equivalent of. A test cross-checks they stay in sync.
 const NON_POST_PREFIXES = ["/admin", "/callback", "/login", "/profile", "/user"];
 const NON_POST_EXACT = new Set(["/", "/timeline", "/moments", "/friends", "/hashtags"]);
 
