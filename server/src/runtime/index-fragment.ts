@@ -3,6 +3,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { getClientConfigWithDefaults } from "../services/config-helpers";
 import { CacheImpl } from "../utils/cache";
 import { canonicalPathForPost } from "../utils/canonical";
+import { buildPostBodyInjection } from "./post-fragment";
 
 // The blog index is client-rendered, so the HTML a crawler receives for "/" is an
 // empty shell: no <title>, no <h1>, and zero <a href>. Posts were therefore only
@@ -50,12 +51,8 @@ export function renderIndexFragment(siteName: string, posts: IndexFragmentPost[]
   );
 }
 
-/** Fragment for the index route; "" for every other path. */
-export async function buildIndexBodyInjection(request: Request, env: Env): Promise<string> {
-  if (new URL(request.url).pathname !== "/") {
-    return "";
-  }
-
+/** Fragment for the index route. Unchanged by the introduction of post fragments. */
+async function buildIndexFragment(env: Env): Promise<string> {
   const schema = await import("../db/schema");
   const db = drizzle(env.DB, { schema });
 
@@ -72,4 +69,26 @@ export async function buildIndexBodyInjection(request: Request, env: Env): Promi
   });
 
   return renderIndexFragment(siteName, posts);
+}
+
+/**
+ * Body fragment for a route. Dispatches on route shape rather than merging the two
+ * renderers, so the working index path stays untouched:
+ *   "/"                    -> index fragment
+ *   a published post route -> post fragment (post-fragment.ts)
+ *   anything else          -> "" (utility, template and list routes get no fragment)
+ */
+export async function buildIndexBodyInjection(request: Request, env: Env): Promise<string> {
+  if (new URL(request.url).pathname === "/") {
+    return buildIndexFragment(env);
+  }
+
+  // Fail soft: injectSeoHead wraps head and body injection in one try/catch, so a throw
+  // here would also discard the head. A post fragment is an enhancement, never a reason
+  // to lose the canonical/robots/JSON-LD.
+  try {
+    return await buildPostBodyInjection(request, env);
+  } catch {
+    return "";
+  }
 }

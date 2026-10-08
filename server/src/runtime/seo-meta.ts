@@ -1,9 +1,9 @@
 import { drizzle } from "drizzle-orm/d1";
-import { eq, or } from "drizzle-orm";
 import { getClientConfigWithDefaults } from "../services/config-helpers";
 import { CacheImpl } from "../utils/cache";
 import { extractImage } from "../utils/image";
 import { canonicalUrlForPost } from "../utils/canonical";
+import { resolvePublishedPost } from "./post-visibility";
 
 const STATIC_ROUTE_TITLES: Record<string, string> = {
   "/timeline": "Timeline",
@@ -33,7 +33,7 @@ export function robotsForListPage(pathname: string): string | undefined {
   return pathname === "/" ? undefined : "noindex, nofollow";
 }
 
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -176,24 +176,13 @@ export async function buildHeadInjection(request: Request, env: Env): Promise<st
     return head + jsonLd;
   }
 
-  const feedMatch = /^\/feed\/([^/]+)$/.exec(pathname);
-  const aliasMatch = feedMatch ? null : /^\/([^/]+)$/.exec(pathname);
-  const slug = feedMatch?.[1] ?? aliasMatch?.[1];
+  const { isPostRoute, post } = await resolvePublishedPost(db, schema, pathname);
 
-  if (!slug) {
+  if (!isPostRoute) {
     return "";
   }
 
-  const idNum = Number.parseInt(slug, 10);
-  const post = await db.query.feeds.findFirst({
-    where: or(eq(schema.feeds.id, idNum), eq(schema.feeds.alias, slug)),
-    with: {
-      hashtags: { columns: {}, with: { hashtag: { columns: { id: true, name: true } } } },
-      user: { columns: { id: true, username: true, avatar: true } },
-    },
-  });
-
-  if (!post || post.draft || !post.listed) {
+  if (!post) {
     return baseTags({
       title: siteName,
       description: siteDescription,

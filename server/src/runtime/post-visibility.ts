@@ -1,4 +1,4 @@
-import { drizzle } from "drizzle-orm/d1";
+import { drizzle, type DrizzleD1Database } from "drizzle-orm/d1";
 import { eq, or } from "drizzle-orm";
 import { getCookie } from "hono/cookie";
 import createJWT from "../utils/jwt";
@@ -26,7 +26,7 @@ export interface PostVisibility {
   published: boolean;
 }
 
-function postSlugFromPath(pathname: string): string | null {
+export function postSlugFromPath(pathname: string): string | null {
   if (NON_POST_EXACT.has(pathname)) return null;
   if (NON_POST_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null;
   if (pathname.startsWith("/hashtag/") || pathname.startsWith("/search/")) return null;
@@ -36,6 +36,42 @@ function postSlugFromPath(pathname: string): string | null {
 
   const aliasMatch = /^\/([^/]+)$/.exec(pathname);
   return aliasMatch ? aliasMatch[1] : null;
+}
+
+/**
+ * THE visibility decision: a post is publicly renderable when it is not a draft and is
+ * listed. Every runtime path that decides whether post content may be shown — the 404
+ * gate below, the head injection (seo-meta.ts) and the body fragment
+ * (post-fragment.ts) — goes through this one predicate. Do not write a second copy; a
+ * test fails if one appears.
+ */
+export function isPublishedPost(post: { draft: unknown; listed: unknown }): boolean {
+  return !post.draft && Boolean(post.listed);
+}
+
+type Schema = typeof import("../db/schema");
+
+/**
+ * Resolve a pathname to its post, in either URL form (`/feed/:id` or `/:alias`).
+ * `post` is null when the path is not a post route, no row matches, or the row is not
+ * published — callers cannot receive unpublished content from here.
+ */
+export async function resolvePublishedPost(db: DrizzleD1Database<Schema>, schema: Schema, pathname: string) {
+  const slug = postSlugFromPath(pathname);
+  if (!slug) {
+    return { isPostRoute: false as const, post: null };
+  }
+
+  const idNum = Number.parseInt(slug, 10);
+  const post = await db.query.feeds.findFirst({
+    where: or(eq(schema.feeds.id, idNum), eq(schema.feeds.alias, slug)),
+    with: {
+      hashtags: { columns: {}, with: { hashtag: { columns: { id: true, name: true } } } },
+      user: { columns: { id: true, username: true, avatar: true } },
+    },
+  });
+
+  return { isPostRoute: true as const, post: post && isPublishedPost(post) ? post : null };
 }
 
 /**
@@ -88,7 +124,7 @@ export async function resolvePostVisibility(request: Request, env: Env): Promise
   return {
     isPostRoute: true,
     found: true,
-    published: !post.draft && Boolean(post.listed),
+    published: isPublishedPost(post),
   };
 }
 
