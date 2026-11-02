@@ -60,45 +60,11 @@ describe("index.html tracking exclusion gate", () => {
   });
 });
 
-describe("index.html GTM loader", () => {
-  beforeEach(() => {
-    resetTrackingState();
-    document.head.innerHTML = "";
-    // The GTM snippet inserts its script node via getElementsByTagName('script')[0];
-    // it needs a sibling script tag to anchor on, same as it would in the real document.
-    document.head.appendChild(document.createElement("script"));
-    runExclusionGateDefinition();
-  });
-
-  afterEach(() => {
-    resetTrackingState();
-    document.head.innerHTML = "";
-  });
-
-  function runGtmLoader() {
-    new Function(extractInlineScript("gtm.start"))();
-  }
-
-  function gtmScriptInjected(): boolean {
-    return Array.from(document.getElementsByTagName("script")).some((el) =>
-      (el.getAttribute("src") ?? "").includes("googletagmanager.com"),
-    );
-  }
-
-  it("injects the GTM script for an anonymous request", () => {
-    runGtmLoader();
-    expect(gtmScriptInjected()).toBe(true);
-  });
-
-  it("does not inject the GTM script for a logged-in request", () => {
-    (globalThis as GlobalWithTrackingGate).__RIN_LOGGED_IN__ = true;
-    runGtmLoader();
-    expect(gtmScriptInjected()).toBe(false);
-  });
-
-  it("does not inject the GTM script for a browser carrying fs_internal_notrack", () => {
-    document.cookie = "fs_internal_notrack=1; path=/";
-    runGtmLoader();
-    expect(gtmScriptInjected()).toBe(false);
+describe("index.html ships no third-party analytics", () => {
+  it("contains no GTM or GA4 id and no Google tag loader", () => {
+    expect(indexHtml).not.toMatch(/GTM-[A-Z0-9]{5,}/);
+    expect(indexHtml).not.toMatch(/\bG-[A-Z0-9]{8,}\b/);
+    expect(indexHtml).not.toContain("googletagmanager.com");
+    expect(indexHtml).not.toContain("google-analytics.com");
   });
 });

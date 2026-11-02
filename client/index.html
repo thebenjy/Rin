@@ -112,28 +112,9 @@
       })();
     </script>
 
-    <!-- Google Tag Manager. Same container as food-signals.com (GTM-PCRD6FN9), which
-         owns the GA4 Configuration tag for the shared "Food Signals" property
-         (G-TSC3B4YS7Z / properties/544475019). Loading it here reports blog pageviews
-         into that same property, distinguished by hostName=blog.food-signals.com — no
-         separate GA4 property or GTM container needed. Do not add a gtag('config')
-         call here (GTM already fires it; that would double-count). -->
-    <script>
-      if (!window.__RIN_EXCLUDE_TRACKING__()) {
-        (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-        new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-        j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-        'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-        })(window,document,'script','dataLayer','GTM-PCRD6FN9');
-      }
-    </script>
-    <!-- Unconditional regardless of the exclusion gate above: other code may call
-         gtag(...) even when GTM never loads, and it must not throw. -->
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-    </script>
+    <!-- No Google Tag Manager or GA4 on the blog (owner decision 2026-11-01, track-visits-by-consent-state
+         tasks 1.2/1.3): blog page titles are health terms and must not reach a third-party analytics
+         property. A static test fails the build if a GTM or GA4 id returns here. -->
   </head>
   <body>
     <div id="root"></div>
